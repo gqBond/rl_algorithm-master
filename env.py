@@ -2,6 +2,10 @@ import gym
 from gym import spaces
 import numpy as np
 import torch
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+from DOI import doi_model
 from DOI.doi_model import MLPModel
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -15,7 +19,7 @@ class CustomEnvironment(gym.Env):
         self.model = model
 
         # Define the action space (DOI values)
-        self.action_space = spaces.Box(low=0, high=1, shape=(2,), dtype=np.float32)
+        self.action_space = spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
 
         # Define the observation space (Efficiency values)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
@@ -30,7 +34,14 @@ class CustomEnvironment(gym.Env):
 
     def step(self, action):
         # Execute the model with the provided DOI values
-        doi_input = np.expand_dims(action, axis=0)
+        df = pd.read_csv('/Users/sunguiquan/Downloads/rl_algorithm-master/virtual dataset_RE_DOI.csv')
+        inf = df[['Inf_NH4', 'Inf_TP']].values
+        scaler_inf = StandardScaler()
+        inf_scaled = scaler_inf.fit_transform(inf)
+        inf_tensor = torch.Tensor(inf_scaled)
+        random_row = np.random.choice(inf_tensor.shape[0])
+        inf_rand = inf_tensor[random_row]
+        doi_input = np.concatenate((inf_rand, action), axis=0)
         input_tensor = torch.Tensor(doi_input)
         with torch.no_grad():
             eff_output = self.model(input_tensor)
@@ -48,7 +59,7 @@ class CustomEnvironment(gym.Env):
         return self.state, reward, done, {}
 
 def main():
-    input_size = 2  # 输入特征数量
+    input_size = 3  # 输入特征数量
     hidden_size = 10  # 隐藏层神经元数量
     output_size = 2  # 输出变量数量（Eff_NH4 和 Eff_TP）
 
@@ -59,7 +70,7 @@ def main():
     # Example of using the CustomEnvironment
     env = CustomEnvironment(best_model)
     env = DummyVecEnv([lambda: env])
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1, n_steps=2048)
 
     # Train the PPO model
     model.learn(total_timesteps=10000)

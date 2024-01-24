@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
+import matplotlib.pyplot as plt
 
 import pandas as pd
 import numpy as np
@@ -27,7 +28,7 @@ def main():
     df = pd.read_csv('../virtual dataset_RE_DOI.csv')
 
     # 提取输入特征和目标变量
-    X = df[['Inf_NH4', 'Inf_TP']].values
+    X = df[['Inf_NH4', 'Inf_TP', 'DOI']].values
     y = df[['Eff_NH4', 'Eff_TP']].values
 
     # 划分数据集为训练集和测试集
@@ -104,6 +105,22 @@ def main():
     # 评估模型性能
     mse = mean_squared_error(y_test, y_pred_unscaled)
     print(f'Mean Squared Error on Test Data: {mse}')
+
+    # # 数据可视化
+    # plt.plot(y_test[:, 0], label='Actual Eff_NH4', marker='o', linestyle='', markersize=5)
+    # plt.plot(y_test[:, 1], label='Actual Eff_TP', marker='o', linestyle='', markersize=5)
+    # plt.plot(y_pred_unscaled[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
+    # plt.plot(y_pred_unscaled[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
+    #
+    # # 添加标签和标题
+    # plt.xlabel('Sample Index')
+    # plt.ylabel('Values')
+    # plt.title('Regression Performance')
+    #
+    # # 添加图例
+    # plt.legend()
+    #
+    # plt.show()
 
     # 使用模型进行预测
     def predict_efficiency(doi_input):
