@@ -11,16 +11,20 @@ import pandas as pd
 import numpy as np
 
 class MLPModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size1, hidden_size2,  output_size):
         super(MLPModel, self).__init__()
-        self.layer1 = nn.Linear(input_size, hidden_size)
+        self.layer1 = nn.Linear(input_size, hidden_size1)
         self.relu = nn.ReLU()
-        self.layer2 = nn.Linear(hidden_size, output_size)
+        self.layer2 = nn.Linear(hidden_size1, hidden_size2)
+        self.relu = nn.ReLU()
+        self.layer3 = nn.Linear(hidden_size2, output_size)
 
     def forward(self, x):
         x = self.layer1(x)
         x = self.relu(x)
         x = self.layer2(x)
+        x = self.relu(x)
+        x = self.layer3(x)
         return x
 
 def main():
@@ -52,17 +56,18 @@ def main():
 
     # 初始化模型
     input_size = 3  # 输入特征数量，加上DOI
-    hidden_size = 10  # 隐藏层神经元数量
+    hidden_size1 = 1024  # 隐藏层神经元数量
+    hidden_size2 = 1024  # 隐藏层神经元数量
     output_size = 2  # 输出变量数量（Eff_NH4 和 Eff_TP）
 
-    model = MLPModel(input_size, hidden_size, output_size)
+    model = MLPModel(input_size, hidden_size1, hidden_size2, output_size)
 
     # 定义损失函数和优化器
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # 超参数
-    num_epochs = 1000
+    num_epochs = 5000
     batch_size = 32
 
     # 转换为 DataLoader
@@ -91,7 +96,7 @@ def main():
                 torch.save(model.state_dict(), '../best_model.pth')
 
     # 加载最低 loss 的模型
-    best_model = MLPModel(input_size, hidden_size, output_size)
+    best_model = MLPModel(input_size, hidden_size1, hidden_size2, output_size)
     best_model.load_state_dict(torch.load('../best_model.pth'))
 
     # 测试模型
@@ -106,21 +111,21 @@ def main():
     mse = mean_squared_error(y_test, y_pred_unscaled)
     print(f'Mean Squared Error on Test Data: {mse}')
 
-    # # 数据可视化
-    # plt.plot(y_test[:, 0], label='Actual Eff_NH4', marker='o', linestyle='', markersize=5)
-    # plt.plot(y_test[:, 1], label='Actual Eff_TP', marker='o', linestyle='', markersize=5)
-    # plt.plot(y_pred_unscaled[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
-    # plt.plot(y_pred_unscaled[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
-    #
-    # # 添加标签和标题
-    # plt.xlabel('Sample Index')
-    # plt.ylabel('Values')
-    # plt.title('Regression Performance')
-    #
-    # # 添加图例
-    # plt.legend()
-    #
-    # plt.show()
+    # 数据可视化
+    plt.plot(y_test[:, 0], label='Actual Eff_NH4', marker='o', linestyle='', markersize=5)
+    plt.plot(y_test[:, 1], label='Actual Eff_TP', marker='o', linestyle='', markersize=5)
+    plt.plot(y_pred_unscaled[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
+    plt.plot(y_pred_unscaled[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
+
+    # 添加标签和标题
+    plt.xlabel('Sample Index')
+    plt.ylabel('Values')
+    plt.title('Regression Performance')
+
+    # 添加图例
+    plt.legend()
+
+    plt.show()
 
     # 使用模型进行预测
     def predict_efficiency(doi_input):
