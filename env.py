@@ -34,7 +34,7 @@ class CustomEnvironment(gym.Env):
 
     def step(self, action):
         # Execute the model with the provided DOI values
-        df = pd.read_csv('/Users/sunguiquan/Downloads/rl_algorithm-master/virtual dataset_RE_DOI.csv')
+        df = pd.read_csv('../virtual dataset_RE_DOI.csv')
         inf = df[['Inf_NH4', 'Inf_TP']].values
         scaler_inf = StandardScaler()
         inf_scaled = scaler_inf.fit_transform(inf)
