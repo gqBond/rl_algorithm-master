@@ -70,7 +70,7 @@ def main():
     # Example of using the CustomEnvironment
     env = CustomEnvironment(best_model)
     env = DummyVecEnv([lambda: env])
-    model = PPO("MlpPolicy", env, verbose=1, n_steps=2048)
+    model = PPO("MlpPolicy", env, verbose=1, n_steps=1024)
 
     # Train the PPO model
     model.learn(total_timesteps=10000)
