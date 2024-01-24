@@ -25,7 +25,7 @@ class CustomEnvironment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
 
         # Initialize the state (initial Inf values)
-        self.state = np.array([1.0, 1.0])
+        self.state = np.random.uniform(low=0.0, high=4.0, size=(2,))
 
         # Init the current_step
         self.current_step = 0
@@ -39,7 +39,7 @@ class CustomEnvironment(gym.Env):
         if self.input_state is not None:
             self.state = np.array(self.input_state)
         else:
-            self.state = np.array([1.0, 1.0])
+            self.state = np.random.uniform(low=0.0, high=4.0, size=(2,))
         return self.state
 
     def step(self, action):
