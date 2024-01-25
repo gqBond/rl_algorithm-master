@@ -38,21 +38,11 @@ def main():
     # 划分数据集为训练集和测试集
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # 数据标准化
-    scaler_X = StandardScaler()
-    scaler_y = StandardScaler()
-
-    X_train_scaled = scaler_X.fit_transform(X_train)
-    X_test_scaled = scaler_X.transform(X_test)
-
-    y_train_scaled = scaler_y.fit_transform(y_train)
-    y_test_scaled = scaler_y.transform(y_test)
-
     # 转换为 PyTorch 的张量
-    X_train_tensor = torch.Tensor(X_train_scaled)
-    y_train_tensor = torch.Tensor(y_train_scaled)
-    X_test_tensor = torch.Tensor(X_test_scaled)
-    y_test_tensor = torch.Tensor(y_test_scaled)
+    X_train_tensor = torch.Tensor(X_train)
+    y_train_tensor = torch.Tensor(y_train)
+    X_test_tensor = torch.Tensor(X_test)
+    y_test_tensor = torch.Tensor(y_test)
 
     # 初始化模型
     input_size = 3  # 输入特征数量，加上DOI
@@ -104,18 +94,18 @@ def main():
     with torch.no_grad():
         y_pred = best_model(X_test_tensor)
 
-    # 反向转换预测值
-    y_pred_unscaled = scaler_y.inverse_transform(y_pred.numpy())
+    # # 反向转换预测值
+    # y_pred_unscaled = scaler_y.inverse_transform(y_pred.numpy())
 
     # 评估模型性能
-    mse = mean_squared_error(y_test, y_pred_unscaled)
+    mse = mean_squared_error(y_test, y_pred)
     print(f'Mean Squared Error on Test Data: {mse}')
 
     # 数据可视化
     plt.plot(y_test[:, 0], label='Actual Eff_NH4', marker='o', linestyle='', markersize=5)
     plt.plot(y_test[:, 1], label='Actual Eff_TP', marker='o', linestyle='', markersize=5)
-    plt.plot(y_pred_unscaled[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
-    plt.plot(y_pred_unscaled[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
+    plt.plot(y_pred[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
+    plt.plot(y_pred[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
 
     # 添加标签和标题
     plt.xlabel('Sample Index')
@@ -127,17 +117,18 @@ def main():
 
     plt.show()
 
-    # 使用模型进行预测
-    def predict_efficiency(doi_input):
-        # 假设 doi_input 是一个包含 'Inf_NH4' 和 'Inf_TP' 的 NumPy 数组
-        scaled_input = scaler_X.transform(doi_input)
-        input_tensor = torch.Tensor(scaled_input)
-        with torch.no_grad():
-            eff_output = best_model(input_tensor)
-        eff_output_unscaled = scaler_y.inverse_transform(eff_output.numpy())
-        return eff_output_unscaled
+    # # 使用模型进行预测
+    # def predict_efficiency(doi_input):
+    #     # 假设 doi_input 是一个包含 'Inf_NH4' 和 'Inf_TP' 的 NumPy 数组
+    #     scaled_input = scaler_X.transform(doi_input)
+    #     input_tensor = torch.Tensor(scaled_input)
+    #     with torch.no_grad():
+    #         eff_output = best_model(input_tensor)
+    #     eff_output_unscaled = scaler_y.inverse_transform(eff_output.numpy())
+    #     return eff_output_unscaled
 
 
 if __name__ == '__main__':
     main()
+
 
