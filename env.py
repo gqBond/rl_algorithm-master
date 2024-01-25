@@ -1,135 +1,134 @@
-import gym
-from gym import spaces
-import numpy as np
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
 
-from doi_model import MLPModel
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
-from datetime import datetime
+import pandas as pd
+import numpy as np
 
+class MLPModel(nn.Module):
+    def __init__(self, input_size, hidden_size1, hidden_size2,  output_size):
+        super(MLPModel, self).__init__()
+        self.layer1 = nn.Linear(input_size, hidden_size1)
+        self.relu = nn.ReLU()
+        self.layer2 = nn.Linear(hidden_size1, hidden_size2)
+        self.relu = nn.ReLU()
+        self.layer3 = nn.Linear(hidden_size2, output_size)
 
-class CustomEnvironment(gym.Env):
-    def __init__(self, model):
-        super(CustomEnvironment, self).__init__()
-
-        self.model = model
-
-        self.input_state = None
-
-        # Define the action space (DOI values)
-        self.action_space = spaces.Box(low=0, high=4, shape=(1,), dtype=np.float32)
-
-        # Define the observation space (Efficiency values)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
-
-        # Initialize the state (initial Inf values)
-        self.state = np.random.uniform(low=0.0, high=4.0, size=(2,))
-
-        # Init the current_step
-        self.current_step = 0
-
-        self.desire = np.array([32.715758,3.569731267])
-
-    def set_input_state(self, input_state):
-        # Set value of input_state
-        self.input_state = input_state
-
-    def reset(self):
-        # Reset the environment to the initial state
-        if self.input_state is not None:
-            self.state = np.array(self.input_state) + np.random.uniform(low=-2, high=2, size=(2,))
-        else:
-            self.state = np.random.uniform(low=0.0, high=4.0, size=(2,))
-        return self.state
-
-    def step(self, action):
-        print('action', action)
-        doi_input = np.concatenate((self.state, action), axis=0)
-        input_tensor = torch.Tensor(doi_input)
-        with torch.no_grad():
-            eff_output = self.model(input_tensor)
-        eff_output_unscaled = eff_output.numpy().flatten()
-
-        # Update current step
-        self.current_step += 1
-
-        # Update the state with the new efficiency values
-        self.state = eff_output_unscaled
-
-        # Calculate reward (higher reward for both efficiencies closer to 1)
-        reward = 10-np.sum(np.abs(self.desire - eff_output_unscaled))
-
-        # Check if the episode is done (for simplicity, you may define your own termination condition)
-        if self.current_step > 1:
-            done = True
-            self.current_step = 0
-        else:
-            done = False
-        # done = False
-
-        return self.state, reward, done, {}
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.relu(x)
+        x = self.layer2(x)
+        x = self.relu(x)
+        x = self.layer3(x)
+        return x
 
 def main():
-    input_size = 3  # 输入特征数量
+    # 读取CSV文件
+    df = pd.read_csv('../virtual dataset_RE_DOI.csv')
+
+    # 提取输入特征和目标变量
+    X = df[['Inf_NH4', 'Inf_TP', 'DOI']].values
+    y = df[['Eff_NH4', 'Eff_TP']].values
+
+    # 划分数据集为训练集和测试集
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # 转换为 PyTorch 的张量
+    X_train_tensor = torch.Tensor(X_train)
+    y_train_tensor = torch.Tensor(y_train)
+    X_test_tensor = torch.Tensor(X_test)
+    y_test_tensor = torch.Tensor(y_test)
+
+    # 初始化模型
+    input_size = 3  # 输入特征数量，加上DOI
     hidden_size1 = 1024  # 隐藏层神经元数量
-    hidden_size2 = 1024
+    hidden_size2 = 1024  # 隐藏层神经元数量
     output_size = 2  # 输出变量数量（Eff_NH4 和 Eff_TP）
+
+    model = MLPModel(input_size, hidden_size1, hidden_size2, output_size)
+
+    # 定义损失函数和优化器
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    # 超参数
+    num_epochs = 5000
+    batch_size = 32
+
+    # 转换为 DataLoader
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+
+    # 初始化最低 loss
+    best_loss = float('inf')
+
+
+    # 训练模型
+    for epoch in range(num_epochs):
+        for batch_X, batch_y in train_loader:
+            optimizer.zero_grad()
+            outputs = model(batch_X)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+
+        if (epoch + 1) % 100 == 0:
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+
+            # 保存最低 loss 的模型
+            if loss.item() < best_loss:
+                best_loss = loss.item()
+                torch.save(model.state_dict(), '../best_model.pth')
 
     # 加载最低 loss 的模型
     best_model = MLPModel(input_size, hidden_size1, hidden_size2, output_size)
-    best_model.load_state_dict(torch.load('best_model1.pth'))
+    best_model.load_state_dict(torch.load('../best_model.pth'))
 
-    # Example of using the CustomEnvironment
-    env = CustomEnvironment(best_model)
+    # 测试模型
+    best_model.eval()
+    with torch.no_grad():
+        y_pred = best_model(X_test_tensor)
 
-    # 手动修改state值
-    env.set_input_state([34.984075, 5.1079907])
+    # # 反向转换预测值
+    # y_pred_unscaled = scaler_y.inverse_transform(y_pred.numpy())
 
-    env = DummyVecEnv([lambda: env])
-    model = PPO("MlpPolicy", env, verbose=1, n_steps=1024)
+    # 评估模型性能
+    mse = mean_squared_error(y_test, y_pred)
+    print(f'Mean Squared Error on Test Data: {mse}')
 
-    # Train the PPO model
-    model.learn(total_timesteps=10000)
+    # 数据可视化
+    plt.plot(y_test[:, 0], label='Actual Eff_NH4', marker='o', linestyle='', markersize=5)
+    plt.plot(y_test[:, 1], label='Actual Eff_TP', marker='o', linestyle='', markersize=5)
+    plt.plot(y_pred[:, 0], label='Predicted Eff_NH4', marker='x', linestyle='', markersize=5)
+    plt.plot(y_pred[:, 1], label='Predicted Eff_TP', marker='x', linestyle='', markersize=5)
 
-    # # Evaluate the trained model
-    # mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
-    # print(f"Mean reward: {mean_reward}")
+    # 添加标签和标题
+    plt.xlabel('Sample Index')
+    plt.ylabel('Values')
+    plt.title('Regression Performance')
 
-    # Example of using the trained PPO model to interact with the environment
-    # init_state = [0.5, 0.5]
-    obs = env.reset()
-
-    # save reward value
-    rewards = []
-    done = False
-    x1, x2 = [], []
-    for _ in range(5):
-        if done :
-            obs = env.reset()
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, done, _ = env.step(action)
-        print(obs, done)
-        # obs = next_obs
-        rewards.append(reward)
-        x1.append(obs[0][0])
-        x2.append(obs[0][1])
-        print(f'reward{reward}')
-        # env.render()
-
-    # 可视化
-    # plt.plot(rewards, label='Reward', marker='o', linestyle='', markersize=1)
-    plt.plot(x1, label='Eff_NH4', marker='o', linestyle='', markersize=1)
-    plt.plot(x2, label='Eff_TP', marker='o', linestyle='', markersize=1)
-    # plt.plot(np.ones_like(x1)*48, label='Eff_NH4_desire', marker='o', linestyle='', markersize=1)
-    # plt.plot(np.ones_like(x2)*4, label='Eff_TP_desire', marker='o', linestyle='', markersize=1)
-    plt.axhline(32.715758, color='g', linestyle='--', label='Eff_NH4_desire')  # 添加目标值为0的水平线
-    plt.axhline(3.569731267, color='r', linestyle='--', label='Eff_TP_desire')  # 添加目标值为0的水平线
-    plt.xlabel('step')
-    plt.ylabel('Eff')
+    # 添加图例
     plt.legend()
+
     plt.show()
+
+    # # 使用模型进行预测
+    # def predict_efficiency(doi_input):
+    #     # 假设 doi_input 是一个包含 'Inf_NH4' 和 'Inf_TP' 的 NumPy 数组
+    #     scaled_input = scaler_X.transform(doi_input)
+    #     input_tensor = torch.Tensor(scaled_input)
+    #     with torch.no_grad():
+    #         eff_output = best_model(input_tensor)
+    #     eff_output_unscaled = scaler_y.inverse_transform(eff_output.numpy())
+    #     return eff_output_unscaled
+
 
 if __name__ == '__main__':
     main()
+
+
